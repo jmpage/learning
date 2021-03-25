@@ -10,13 +10,20 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(args: &[String]) -> Result<Config, &str> {
-        if args.len() < 3 {
-            return Err("Two arguments are required");
-        }
+    pub fn new<I>(mut args: I) -> Result<Config, &'static str>
+    where
+        I: Iterator<Item = String>,
+    {
+        args.next();
 
-        let query = args[1].clone();
-        let filename = args[2].clone();
+        let query = match args.next() {
+            Some(arg) => arg,
+            None => return Err("A query string must be specified"),
+        };
+        let filename = match args.next() {
+            Some(arg) => arg,
+            None => return Err("A filename must be specified"),
+        };
         let case_sensitive = env::var("CASE_INSENSITIVE").is_err();
 
         Ok(Config {
@@ -43,28 +50,19 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let mut results = Vec::new();
-
-    for line in contents.lines() {
-        if line.contains(query) {
-            results.push(line);
-        }
-    }
-
-    results
+    contents
+        .lines()
+        .filter(|line| line.contains(query))
+        .collect()
 }
 
 pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
     let query = query.to_lowercase();
-    let mut results = Vec::new();
 
-    for line in contents.lines() {
-        if line.to_lowercase().contains(&query) {
-            results.push(line);
-        }
-    }
-
-    results
+    contents
+        .lines()
+        .filter(|line| line.to_lowercase().contains(&query))
+        .collect()
 }
 
 #[cfg(test)]
@@ -73,9 +71,9 @@ mod tests {
 
     #[test]
     fn config_new_with_valid_args() {
-        let args = ["".to_string(), "foo".to_string(), "bar".to_string()];
+        let args = vec!["".to_string(), "foo".to_string(), "bar".to_string()];
         assert_eq!(
-            Config::new(&args).unwrap(),
+            Config::new(args.into_iter()).unwrap(),
             Config {
                 query: String::from("foo"),
                 filename: String::from("bar"),
@@ -85,11 +83,20 @@ mod tests {
     }
 
     #[test]
-    fn config_new_with_too_few_args() {
-        let args = ["".to_string()];
+    fn config_new_without_query() {
+        let args = vec!["".to_string()];
         assert_eq!(
-            Config::new(&args).unwrap_err(),
-            "Two arguments are required"
+            Config::new(args.into_iter()).unwrap_err(),
+            "A query string must be specified"
+        );
+    }
+
+    #[test]
+    fn config_new_without_filename() {
+        let args = vec!["".to_string(), "".to_string()];
+        assert_eq!(
+            Config::new(args.into_iter()).unwrap_err(),
+            "A filename must be specified"
         );
     }
 
