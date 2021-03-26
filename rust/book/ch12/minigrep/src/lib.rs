@@ -49,20 +49,21 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn closure_search<'a, F>(matcher: F, contents: &'a str) -> Vec<&'a str>
+where
+    F: Fn(&&str) -> bool,
+{
+    contents.lines().filter(matcher).collect()
+}
+
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    contents
-        .lines()
-        .filter(|line| line.contains(query))
-        .collect()
+    closure_search(|line| line.contains(query), contents)
 }
 
 pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
     let query = query.to_lowercase();
 
-    contents
-        .lines()
-        .filter(|line| line.to_lowercase().contains(&query))
-        .collect()
+    closure_search(|line| line.to_lowercase().contains(&query), contents)
 }
 
 #[cfg(test)]
